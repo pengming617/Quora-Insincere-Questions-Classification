@@ -1,5 +1,6 @@
 # encoding:utf-8
 import tensorflow as tf
+from tensorflow.python.ops import array_ops
 
 
 class TextCNN(object):
@@ -62,10 +63,40 @@ class TextCNN(object):
         # Calculate mean cross-entropy loss
         with tf.name_scope("loss"):
             losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
-            self.loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
+            loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
+            self.focal_loss = self.focal_loss(tf.nn.softmax(self.scores, 1), tf.cast(self.input_y, tf.float32))
+            self.loss = 0.8 * self.focal_loss + 0.2 * loss
 
         # Accuracy
         with tf.name_scope("accuracy"):
             correct_predictions = tf.equal(self.predictions, tf.argmax(self.input_y, 1))
             self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
 
+    def focal_loss(self, prediction_tensor, target_tensor, weights=None, alpha=1.0, gamma=2):
+        r"""Compute focal loss for predictions.
+            Multi-labels Focal loss formula:
+                FL = -alpha * (z-p)^gamma * log(p) -(1-alpha) * p^gamma * log(1-p)
+                     ,which alpha = 0.25, gamma = 2, p = sigmoid(x), z = target_tensor.
+        Args:
+         prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+            num_classes] representing the predicted logits for each class
+         target_tensor: A float tensor of shape [batch_size, num_anchors,
+            num_classes] representing one-hot encoded classification targets
+         weights: A float tensor of shape [batch_size, num_anchors]
+         alpha: A scalar tensor for focal loss alpha hyper-parameter
+         gamma: A scalar tensor for focal loss gamma hyper-parameter
+        Returns:
+            loss: A (scalar) tensor representing the value of the loss function
+        """
+        # sigmoid_p = tf.nn.sigmoid(prediction_tensor)
+        sigmoid_p = prediction_tensor
+
+        zeros = array_ops.zeros_like(sigmoid_p, dtype=sigmoid_p.dtype)
+
+        # For poitive prediction, only need consider front part loss, back part is 0;
+        # target_tensor > zeros <=> z=1, so poitive coefficient = z - p.
+        pos_p_sub = array_ops.where(target_tensor > zeros, target_tensor - sigmoid_p, zeros)
+
+        my_entry_cross = - alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(sigmoid_p, 1e-8, 1.0))
+
+        return tf.reduce_mean(my_entry_cross)

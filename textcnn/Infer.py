@@ -2,19 +2,19 @@ import tensorflow.contrib.learn as learn
 import os
 import tensorflow as tf
 import numpy as np
-import jieba
+import textcnn.Processing as Processing
 
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 FLAGS = tf.flags.FLAGS
+process = Processing.Processing()
 
 dicts = {}
-with open("model/dl_model/textcnn/labels.txt", 'r', encoding="utf-8") as f:
+with open("model/labels.txt", 'r', encoding="utf-8") as f:
     for line in f.readlines():
         tag_type = line.replace("\n", "").split(":")
         dicts[int(tag_type[0])] = tag_type[1]
-project_root_path = os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), "../..")))
 
 
 class Infer(object):
@@ -22,8 +22,8 @@ class Infer(object):
         ues CNN model to predict classification.
     """
     def __init__(self):
-        self.vocab_processor = learn.preprocessing.VocabularyProcessor.restore('model/dl_model/textcnn/vocab.pickle')
-        self.checkpoint_file = tf.train.latest_checkpoint('model/dl_model/textcnn')
+        self.vocab_processor = learn.preprocessing.VocabularyProcessor.restore('model/vocab.pickle')
+        self.checkpoint_file = tf.train.latest_checkpoint('model')
         graph = tf.Graph()
         with graph.as_default():
             session_conf = tf.ConfigProto(allow_soft_placement=FLAGS.allow_soft_placement,
@@ -46,7 +46,9 @@ class Infer(object):
         # transfer to vector
         sentence_word = []
         for sentence in sentences:
-            sentence_word.append(' '.join(jieba.cut(sentence)))
+            sentence = process.preprocess(sentence)
+            # sentence_word.append(' '.join(jieba.cut(sentence)))
+            sentence_word.append(sentence)
         sentences_vectors = np.array(list(self.vocab_processor.fit_transform(sentence_word)))
         # softmax
         score = tf.nn.softmax(self.scores, 1)

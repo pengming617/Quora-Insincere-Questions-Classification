@@ -81,7 +81,7 @@ class TrainModel(object):
                         }
                         _, loss, train_accuracy = sess.run([train_op, textcnn.loss, textcnn.accuracy], feed_dict)
 
-                    print("第"+str((time+1))+"次迭代的损失为："+str(loss)+";准确率为："+str(train_accuracy))
+                    print("训练集：第"+str((time+1))+"次迭代的损失为："+str(loss)+";准确率为："+str(train_accuracy))
 
                     all_dev = []
                     for devX_batch, devY_batch in self.get_batches(X_val, y_val, batch_size):
@@ -103,7 +103,7 @@ class TrainModel(object):
                     dev_f1 = f1_score(np.array(y_true), np.array(all_dev))
                     dev_recall = recall_score(np.array(y_true), np.array(all_dev))
                     dev_acc = accuracy_score(np.array(y_true), np.array(all_dev))
-                    print("f1:{},recall:{},acc:{}".format(dev_f1, dev_recall, dev_acc))
+                    print("验证集：f1:{},recall:{},acc:{}\n".format(dev_f1, dev_recall, dev_acc))
                     if dev_f1 > best_f1:
                         best_f1 = dev_f1
                         saver.save(sess, "model/TextCNNModel.ckpt")

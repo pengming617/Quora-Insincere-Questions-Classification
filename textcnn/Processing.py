@@ -59,7 +59,7 @@ class Processing(object):
         for word in doc:
             if len(word) >= 3 and word not in stop_words and wordnet.synsets(word):
                 word = wnl.lemmatize(word)
-                word = ps.stem(word)
+                # word = ps.stem(word)
                 newdoc.append(word)
         return ' '.join(newdoc)
 
@@ -67,9 +67,11 @@ class Processing(object):
         length = []
         articlesWords = []
         for article in articles:
-            words = [x for x in jieba.cut(article) if x != '']
-            articlesWords.append(' '.join(words))
-            length.append(len(words))
+            article = self.preprocess(article)
+            # words = [x for x in jieba.cut(article) if x != ' ']
+            # articlesWords.append(' '.join(words))
+            articlesWords.append(article)
+            length.append(len(article.split(" ")))
         max_length = max(length)
         vocab_processor = learn.preprocessing.VocabularyProcessor(max_length)
         vocab_processor.fit(articlesWords)
