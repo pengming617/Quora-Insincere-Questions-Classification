@@ -41,12 +41,12 @@ class TrainModel(object):
 
             with tf.name_scope("readfile"):
                 processing = Processing.Processing()
-                articles, tags = processing.loadPracticeFile(project_root_path+"/data/train_all.txt")
+                articles, tags = processing.loadPracticeFile("data/train_all.txt")
                 self.data_embedding_new, self.tags_new = processing.embedding(articles, tags)
                 X_train, X_val, y_train, y_val = train_test_split(
                     self.data_embedding_new, self.tags_new, test_size=0.2, random_state=0)
             # 加载词典
-            vocab = learn.preprocessing.VocabularyProcessor.restore(os.getcwd()+'/vocab.pickle')
+            vocab = learn.preprocessing.VocabularyProcessor.restore('model/vocab.pickle')
 
             with sess.as_default():
                 textcnn = TextCNN.TextCNN(
@@ -119,7 +119,7 @@ class TrainModel(object):
                     print("f1:{},recall:{},acc:{}".format(dev_f1, dev_recall, dev_acc))
                     if dev_f1 > best_f1:
                         best_f1 = dev_f1
-                        saver.save(sess, "./TextCNNModel.ckpt")
+                        saver.save(sess, "model/TextCNNModel.ckpt")
                         print("saved\n")
 
 

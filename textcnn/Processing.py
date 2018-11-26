@@ -12,9 +12,9 @@ import os
 
 root_path = os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), ".")))
 stop_words = []
-with open('stop_words.txt', 'r') as stop_file:
+with open('textcnn/stop_words.txt', 'r') as stop_file:
     for line in stop_file.readlines():
-        line = line.replace("\n", "").replace("\\","")
+        line = line.replace("\n", "").replace("\\", "")
         stop_words.append(line)
 
 
@@ -74,14 +74,14 @@ class Processing(object):
         vocab_processor = learn.preprocessing.VocabularyProcessor(max_length)
         vocab_processor.fit(articlesWords)
         data_embedding = np.array(list(vocab_processor.fit_transform(articlesWords)))
-        vocab_processor.save(os.getcwd()+'/vocab.pickle')
+        vocab_processor.save('model/vocab.pickle')
         index = [x for x in range(len(articles))]
         random.shuffle(index)
         data_embedding_new = [data_embedding[x] for x in index]
         tags_new = [tags[x] for x in index]
 
         # 将类型用数字替换
-        label_file = open('labels.txt', 'w')
+        label_file = open('model/labels.txt', 'w')
         type = list(set(tags_new))
         for temp in range(len(type)):
             print(str(temp) + ":" + type[temp])
