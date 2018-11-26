@@ -41,7 +41,7 @@ class TrainModel(object):
 
             with tf.name_scope("readfile"):
                 processing = Processing.Processing()
-                articles, tags = processing.loadPracticeFile("data/train_all.txt")
+                articles, tags = processing.loadPracticeFile("data/train.txt")
                 self.data_embedding_new, self.tags_new = processing.embedding(articles, tags)
                 X_train, X_val, y_train, y_val = train_test_split(
                     self.data_embedding_new, self.tags_new, test_size=0.2, random_state=0)
@@ -73,17 +73,7 @@ class TrainModel(object):
 
                 for time in range(config.epoch):
                     batch_size = config.Batch_Size
-                    if int(len(X_train) % batch_size) == 0:
-                        batches = int(len(X_train) / batch_size)
-                    else:
-                        batches = int(len(X_train) / batch_size) + 1
-                    for x in range(batches):
-                        if x != batches-1:
-                            trainX_batch = X_train[x * batch_size:(x + 1) * batch_size]
-                            trainY_batch = y_train[x * batch_size:(x + 1) * batch_size]
-                        else:
-                            trainX_batch = X_train[x * batch_size:len(articles)]
-                            trainY_batch = y_train[x * batch_size:len(articles)]
+                    for trainX_batch, trainY_batch in self.get_batches(X_train, y_train, batch_size):
                         feed_dict = {
                             textcnn.input_x: np.array(trainX_batch),
                             textcnn.input_y: np.array(trainY_batch),
@@ -93,19 +83,16 @@ class TrainModel(object):
 
                     print("第"+str((time+1))+"次迭代的损失为："+str(loss)+";准确率为："+str(train_accuracy))
 
-                    def dev_step(dev_x, dev_y):
-                        """
-                        Evaluates model on a dev set
-                        """
+                    all_dev = []
+                    for devX_batch, devY_batch in self.get_batches(X_val, y_val, batch_size):
                         feed_dict = {
-                            textcnn.input_x: np.array(dev_x),
-                            textcnn.input_y: np.array(dev_y),
+                            textcnn.input_x: np.array(devX_batch),
+                            textcnn.input_y: np.array(devY_batch),
                             textcnn.drop_keep_prob: 1.0
                         }
                         dev_loss, dev_predictions = sess.run([textcnn.loss, textcnn.predictions], feed_dict)
-                        print("验证集：loss {:g}\n".format(dev_loss))
-                        return dev_loss, dev_predictions
-                    dev_loss, dev_predictions = dev_step(X_val, y_val)
+                        all_dev.extend(dev_predictions.tolist())
+
                     # f1值
                     y_true = []
                     for x in y_val:
@@ -113,14 +100,29 @@ class TrainModel(object):
                             y_true.append(0)
                         else:
                             y_true.append(1)
-                    dev_f1 = f1_score(np.array(y_true), dev_predictions)
-                    dev_recall= recall_score(np.array(y_true), dev_predictions)
-                    dev_acc = accuracy_score(np.array(y_true), dev_predictions)
+                    dev_f1 = f1_score(np.array(y_true), np.array(all_dev))
+                    dev_recall = recall_score(np.array(y_true), np.array(all_dev))
+                    dev_acc = accuracy_score(np.array(y_true), np.array(all_dev))
                     print("f1:{},recall:{},acc:{}".format(dev_f1, dev_recall, dev_acc))
                     if dev_f1 > best_f1:
                         best_f1 = dev_f1
                         saver.save(sess, "model/TextCNNModel.ckpt")
                         print("saved\n")
+
+    def get_batches(self, X, Y, batch_size):
+        if int(len(X) % batch_size) == 0:
+            batches = int(len(X) / batch_size)
+        else:
+            batches = int(len(X) / batch_size) + 1
+        for x in range(batches):
+            if x != batches - 1:
+                trainX_batch = X[x * batch_size:(x + 1) * batch_size]
+                trainY_batch = Y[x * batch_size:(x + 1) * batch_size]
+            else:
+                trainX_batch = X[x * batch_size:len(X)]
+                trainY_batch = Y[x * batch_size:len(Y)]
+            yield trainX_batch, trainY_batch
+
 
 
 if __name__ == '__main__':

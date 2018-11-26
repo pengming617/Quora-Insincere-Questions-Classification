@@ -4,7 +4,7 @@
 class Config(object):
 
     def __init__(self):
-        self.Batch_Size = 64
+        self.Batch_Size = 256
         self.epoch = 100
 
 
