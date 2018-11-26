@@ -5,7 +5,7 @@ class Config(object):
 
     def __init__(self):
         self.Batch_Size = 256
-        self.epoch = 100
+        self.epoch = 50
 
 
 if __name__ == '__main__':
