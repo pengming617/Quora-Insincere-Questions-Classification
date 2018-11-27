@@ -8,7 +8,8 @@ Infer = Infer.Infer()
 csv_file = csv.reader(open('data/test.csv', 'r'))
 i = 1
 for line in csv_file:
-    print(i)
+    if i % 1000 == 0:
+        print(i)
     i = i + 1
     if len(line) == 2 and line[0] != 'qid':
         labels, s = Infer.infer([line[1]])
