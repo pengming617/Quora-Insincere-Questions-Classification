@@ -1,6 +1,5 @@
 # encoding:utf-8
 from tensorflow.contrib import learn
-import jieba
 import numpy as np
 import random
 import string
@@ -11,11 +10,11 @@ from nltk.corpus import wordnet
 import os
 
 root_path = os.path.dirname(os.path.abspath(os.path.join(os.getcwd(), ".")))
-stop_words = []
-with open('textcnn/stop_words.txt', 'r') as stop_file:
-    for line in stop_file.readlines():
-        line = line.replace("\n", "").replace("\\", "")
-        stop_words.append(line)
+# stop_words = []
+# with open('textcnn/stop_words.txt', 'r') as stop_file:
+#     for line in stop_file.readlines():
+#         line = line.replace("\n", "").replace("\\", "")
+#         stop_words.append(line)
 
 
 class Processing(object):
@@ -57,7 +56,8 @@ class Processing(object):
         # 只保留长度不小于3的单词,去除停用词,验证是否为英文单词(利用wordnet)
         newdoc = []
         for word in doc:
-            if len(word) >= 3 and word not in stop_words and wordnet.synsets(word):
+            # if len(word) >= 3 and word not in stop_words and wordnet.synsets(word):
+            if len(word) >= 3 and wordnet.synsets(word):
                 word = wnl.lemmatize(word)
                 # word = ps.stem(word)
                 newdoc.append(word)
