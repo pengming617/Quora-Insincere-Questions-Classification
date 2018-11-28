@@ -81,18 +81,13 @@ class Processing(object):
         random.shuffle(index)
         data_embedding_new = [data_embedding[x] for x in index]
         tags_new = [tags[x] for x in index]
-
-        # 将类型用数字替换
-        label_file = open('model/labels.txt', 'w')
-        type = list(set(tags_new))
-        for temp in range(len(type)):
-            print(str(temp) + ":" + type[temp])
-            label_file.writelines(str(temp) + ":" + type[temp] + "\n")
-        tags_new = [type.index(x) for x in tags_new]
         tags_vec = []
         for x in tags_new:
-            temp = [0] * len(type)
-            temp[x] = 1
+            temp = [0] * 2
+            if x == '0':
+                temp[0] = 1
+            else:
+                temp[1] = 1
             tags_vec.append(temp)
 
         return data_embedding_new, tags_vec

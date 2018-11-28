@@ -1,5 +1,4 @@
 import tensorflow.contrib.learn as learn
-import os
 import tensorflow as tf
 import numpy as np
 import textcnn.Processing as Processing
@@ -10,11 +9,7 @@ tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on 
 FLAGS = tf.flags.FLAGS
 process = Processing.Processing()
 
-dicts = {}
-with open("model/labels.txt", 'r', encoding="utf-8") as f:
-    for line in f.readlines():
-        tag_type = line.replace("\n", "").split(":")
-        dicts[int(tag_type[0])] = tag_type[1]
+dicts = {0: '0', 1: '1'}
 
 
 class Infer(object):
