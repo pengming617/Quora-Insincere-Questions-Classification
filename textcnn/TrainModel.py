@@ -124,7 +124,6 @@ class TrainModel(object):
             yield trainX_batch, trainY_batch
 
 
-
 if __name__ == '__main__':
     train = TrainModel()
     train.trainModel()
