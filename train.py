@@ -1,4 +1,4 @@
-import textcnn.TrainModel as TrainModel
+import charcnn.TrainModel as TrainModel
 
 Train = TrainModel.TrainModel()
 Train.trainModel()
