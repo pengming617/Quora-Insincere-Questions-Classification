@@ -79,7 +79,7 @@ class CharCNN(object):
             losses = tf.nn.softmax_cross_entropy_with_logits(labels=self.input_y, logits=self.logit)
             loss = tf.reduce_mean(losses)
             self.focal_loss = self.focal_loss(self.score, tf.cast(self.input_y, tf.float32))
-            self.loss = 0.7 * self.focal_loss + 0.3 * loss
+            self.loss = 0.8 * self.focal_loss + 0.2 * loss
 
         with tf.name_scope("Accuracy"):
             # Accuracy
@@ -100,7 +100,7 @@ class CharCNN(object):
             # 将计算出的梯度应用到变量上
             self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
-    def focal_loss(self, prediction_tensor, target_tensor, weights=None, alpha=1.0, gamma=2):
+    def focal_loss(self, prediction_tensor, target_tensor, weights=None, alpha=0.75, gamma=2):
         r"""Compute focal loss for predictions.
             Multi-labels Focal loss formula:
                 FL = -alpha * (z-p)^gamma * log(p) -(1-alpha) * p^gamma * log(1-p)
