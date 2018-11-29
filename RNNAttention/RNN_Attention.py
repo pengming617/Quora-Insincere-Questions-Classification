@@ -47,6 +47,8 @@ class RNN_Attention(object):
                 attn_z.append(z_t)
             # transform to batch_size * sequence_length
             attn_zconcat = tf.concat(attn_z, axis=1)
+            # masked
+            attn_zconcat = self.mask(attn_zconcat, self.seq_length, max_length)
             self.alpha = tf.nn.softmax(attn_zconcat)
             # transform to sequence_length * batch_size * 1 , same rank as outputs
             alpha_trans = tf.expand_dims(self.alpha, -1)

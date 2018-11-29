@@ -4,7 +4,6 @@ from RNNAttention.Processing import Processing
 from RNNAttention.Config import Config
 from RNNAttention.RNN_Attention import RNN_Attention
 from sklearn.model_selection import train_test_split
-import os
 import numpy as np
 from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
@@ -14,16 +13,14 @@ from tensorflow.contrib import learn
 # Model Hyperparameters
 tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
-tf.flags.DEFINE_integer("hidden_num", 100, "the number of hidden units")
-tf.flags.DEFINE_integer("attn_size", 100, "the number of attn_size units")
-tf.flags.DEFINE_integer("hidden_size", 1, "the number of hidden size")
+tf.flags.DEFINE_integer("hidden_num", 200, "the number of hidden units")
+tf.flags.DEFINE_integer("attn_size", 200, "the number of attn_size units")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.01, "L1 regularization lambda (default: 0.0)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 FLAGS = tf.flags.FLAGS
 config = Config()
-root_path = os.getcwd()
 
 
 class TrainModel(object):
@@ -38,7 +35,7 @@ class TrainModel(object):
             sess = tf.Session(config=session_conf)
             with tf.name_scope("readfile"):
                 processing = Processing()
-                articles, tags = processing.loadPracticeFile("data/train_all.txt")
+                articles, tags = processing.loadPracticeFile("data/train.txt")
                 self.data_embedding_new, self.tags_new = processing.embedding(articles, tags)
                 X_train, X_val, y_train, y_val = train_test_split(
                     self.data_embedding_new, self.tags_new, test_size=0.2, random_state=0)
