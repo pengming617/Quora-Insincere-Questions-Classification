@@ -1,4 +1,4 @@
-import textcnn.Infer as Infer
+import RNNAttention.Infer as Infer
 import pandas as pd
 import math
 from tqdm import tqdm
