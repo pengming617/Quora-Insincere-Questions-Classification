@@ -55,15 +55,13 @@ class Infer(object):
                 sentence_word.append(sentence)
                 length.append(sen_len)
         sentences_vectors = np.array(list(self.vocab_processor.fit_transform(sentence_word)))
-        # softmax
-        score = tf.nn.softmax(self.scores, 1)
 
         feed_dict = {
             self.input_x: sentences_vectors,
             self.drop_keep_prob: 1.0,
             self.seq_length: np.array(length)
         }
-        y, s = self.sess.run([self.predictions, score], feed_dict)
+        y, s = self.sess.run([self.predictions, self.scores], feed_dict)
 
         labels = []
         for x in range(len(y)):
