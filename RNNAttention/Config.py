@@ -6,7 +6,7 @@ class Config(object):
 
     def __init__(self):
         self.batch_size = 256
-        self.epoch = 20
+        self.epoch = 10
 
 
 if __name__ == '__main__':

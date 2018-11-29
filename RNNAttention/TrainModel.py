@@ -11,10 +11,10 @@ from sklearn.metrics import accuracy_score
 from tensorflow.contrib import learn
 
 # Model Hyperparameters
-tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding (default: 128)")
+tf.flags.DEFINE_integer("embedding_dim", 256, "Dimensionality of character embedding (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
-tf.flags.DEFINE_integer("hidden_num", 200, "the number of hidden units")
-tf.flags.DEFINE_integer("attn_size", 200, "the number of attn_size units")
+tf.flags.DEFINE_integer("hidden_num", 100, "the number of hidden units")
+tf.flags.DEFINE_integer("attn_size", 100, "the number of attn_size units")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.01, "L1 regularization lambda (default: 0.0)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
