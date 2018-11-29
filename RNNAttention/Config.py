@@ -5,7 +5,7 @@ import os
 class Config(object):
 
     def __init__(self):
-        self.batch_size = 64
+        self.batch_size = 256
         self.epoch = 20
 
 
