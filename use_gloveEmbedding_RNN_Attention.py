@@ -100,7 +100,7 @@ def batch_gen_test(x_df):
 class RNN_Attention(object):
 
     def __init__(self, max_length, num_classes, hidden_num, attn_size):
-        with tf.device('/gpu:1'):
+        with tf.device('/gpu:2'):
             # placeholders for input output and dropout
             self.input_x = tf.placeholder(tf.float32, shape=[None, max_length, 300], name='input_x')
             self.input_y = tf.placeholder(tf.int32, shape=[None], name='input_y')
