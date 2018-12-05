@@ -100,63 +100,64 @@ def batch_gen_test(x_df):
 class RNN_Attention(object):
 
     def __init__(self, max_length, num_classes, hidden_num, attn_size):
-        # placeholders for input output and dropout
-        self.input_x = tf.placeholder(tf.float32, shape=[None, max_length, 300], name='input_x')
-        self.input_y = tf.placeholder(tf.int32, shape=[None], name='input_y')
-        self.drop_out_prob = tf.placeholder(tf.float32, name='drop_out_keep')
-        self.seq_length = tf.placeholder(tf.int32, [None], name='seq_length')  # 语句的真实长度
+        with tf.device('/gpu:1'):
+            # placeholders for input output and dropout
+            self.input_x = tf.placeholder(tf.float32, shape=[None, max_length, 300], name='input_x')
+            self.input_y = tf.placeholder(tf.int32, shape=[None], name='input_y')
+            self.drop_out_prob = tf.placeholder(tf.float32, name='drop_out_keep')
+            self.seq_length = tf.placeholder(tf.int32, [None], name='seq_length')  # 语句的真实长度
 
-        self.embedding_chars = self.input_x
+            self.embedding_chars = self.input_x
 
-        # build model
-        cell_fw = tf.nn.rnn_cell.LSTMCell(hidden_num)
-        fw_lstm_cell = tf.contrib.rnn.DropoutWrapper(cell_fw, output_keep_prob=self.drop_out_prob)
-        cell_bw = tf.nn.rnn_cell.LSTMCell(hidden_num)
-        bw_lstm_cell = tf.contrib.rnn.DropoutWrapper(cell_bw, output_keep_prob=self.drop_out_prob)
+            # build model
+            cell_fw = tf.nn.rnn_cell.LSTMCell(hidden_num)
+            fw_lstm_cell = tf.contrib.rnn.DropoutWrapper(cell_fw, output_keep_prob=self.drop_out_prob)
+            cell_bw = tf.nn.rnn_cell.LSTMCell(hidden_num)
+            bw_lstm_cell = tf.contrib.rnn.DropoutWrapper(cell_bw, output_keep_prob=self.drop_out_prob)
 
-        (outputs, output_states) = tf.nn.bidirectional_dynamic_rnn(fw_lstm_cell, bw_lstm_cell, self.embedding_chars,
-                                                                   sequence_length=self.seq_length,
-                                                                   dtype=tf.float32)
-        outputs = tf.concat(outputs, axis=2)
+            (outputs, output_states) = tf.nn.bidirectional_dynamic_rnn(fw_lstm_cell, bw_lstm_cell, self.embedding_chars,
+                                                                       sequence_length=self.seq_length,
+                                                                       dtype=tf.float32)
+            outputs = tf.concat(outputs, axis=2)
 
-        # attention Trainable parameters
-        w_omega = tf.Variable(tf.random_normal([2 * hidden_num, attn_size], stddev=0.1))
-        b_omega = tf.Variable(tf.random_normal([attn_size], stddev=0.1))
-        u_omega = tf.Variable(tf.random_normal([attn_size], stddev=0.1))
+            # attention Trainable parameters
+            w_omega = tf.Variable(tf.random_normal([2 * hidden_num, attn_size], stddev=0.1))
+            b_omega = tf.Variable(tf.random_normal([attn_size], stddev=0.1))
+            u_omega = tf.Variable(tf.random_normal([attn_size], stddev=0.1))
 
-        with tf.name_scope('v'):
-            # Applying fully connected layer with non-linear activation to each of the B*T timestamps;
-            #  the shape of `v` is (B,T,D)*(D,A)=(B,T,A), where A=attention_size
-            v = tf.tanh(tf.einsum("ijk,kl->ijl", outputs, w_omega) + b_omega)
+            with tf.name_scope('v'):
+                # Applying fully connected layer with non-linear activation to each of the B*T timestamps;
+                #  the shape of `v` is (B,T,D)*(D,A)=(B,T,A), where A=attention_size
+                v = tf.tanh(tf.einsum("ijk,kl->ijl", outputs, w_omega) + b_omega)
 
-        # For each of the timestamps its vector of size A from `v` is reduced with `u` vector
-        vu = tf.einsum("ijk,kl->ijl", v, tf.expand_dims(u_omega,-1))  # (B,T) shape
-        vu = tf.squeeze(vu, -1)
-        vu = self.mask(vu, self.seq_length, max_length)
+            # For each of the timestamps its vector of size A from `v` is reduced with `u` vector
+            vu = tf.einsum("ijk,kl->ijl", v, tf.expand_dims(u_omega,-1))  # (B,T) shape
+            vu = tf.squeeze(vu, -1)
+            vu = self.mask(vu, self.seq_length, max_length)
 
-        alphas = tf.nn.softmax(vu, name='alphas')  # (B,T) shape
+            alphas = tf.nn.softmax(vu, name='alphas')  # (B,T) shape
 
-        # Output of (Bi-)RNN is reduced with attention vector; the result has (B,D) shape
-        self.final_output = tf.reduce_sum(outputs * tf.expand_dims(alphas, -1), 1)
+            # Output of (Bi-)RNN is reduced with attention vector; the result has (B,D) shape
+            self.final_output = tf.reduce_sum(outputs * tf.expand_dims(alphas, -1), 1)
 
-        # outputs shape: (batch_size, sequence_length, 2*hidden_num)
-        fc_w = tf.Variable(tf.truncated_normal([2 * hidden_num, num_classes], stddev=0.1), name='fc_w')
-        fc_b = tf.Variable(tf.zeros([num_classes]), name='fc_b')
+            # outputs shape: (batch_size, sequence_length, 2*hidden_num)
+            fc_w = tf.Variable(tf.truncated_normal([2 * hidden_num, num_classes], stddev=0.1), name='fc_w')
+            fc_b = tf.Variable(tf.zeros([num_classes]), name='fc_b')
 
-        self.logits = tf.matmul(self.final_output, fc_w) + fc_b
-        self.score = tf.nn.softmax(self.logits, name='score')
-        self.predictions = tf.argmax(self.score, 1, name="predictions")
+            self.logits = tf.matmul(self.final_output, fc_w) + fc_b
+            self.score = tf.nn.softmax(self.logits, name='score')
+            self.predictions = tf.argmax(self.score, 1, name="predictions")
 
-        self.cost = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.input_y, logits=self.logits)
-        self.cost = tf.reduce_sum(self.cost)
-        tvars = tf.trainable_variables()
-        grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), 5)
+            self.cost = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.input_y, logits=self.logits)
+            self.cost = tf.reduce_sum(self.cost)
+            tvars = tf.trainable_variables()
+            grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), 5)
 
-        optimizer = tf.train.AdamOptimizer(0.001)
-        self.train_op = optimizer.apply_gradients(zip(grads, tvars))
+            optimizer = tf.train.AdamOptimizer(0.001)
+            self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
-        self.accuracy = tf.reduce_mean(
-            tf.cast(tf.equal(self.input_y, tf.cast(self.predictions, tf.int32)), tf.float32))
+            self.accuracy = tf.reduce_mean(
+                tf.cast(tf.equal(self.input_y, tf.cast(self.predictions, tf.int32)), tf.float32))
 
     def mask(self, inputs, seq_len, max_len):
         mask = tf.cast(tf.sequence_mask(seq_len, maxlen=max_len), tf.float32)
