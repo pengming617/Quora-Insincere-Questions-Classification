@@ -20,11 +20,10 @@ if not os.path.exists('output'):
 else:
     print('output exist')
 train_df = pd.read_csv("data/train.csv")
-train_df, val_df = train_test_split(train_df, test_size=0.2)
+train_df, val_df = train_test_split(train_df, test_size=0.1)
 
 embeddings_index = {}
 f = open('data/glove.840B.300d.txt')
-# f = open('../input/embeddings/paragram_300_sl999/paragram_300_sl999.txt')
 for line in tqdm(f):
     values = line.split(" ")
     word = values[0]
@@ -36,14 +35,13 @@ batch_size = 256
 SEQ_LEN = 70
 # Model Hyperparameters
 dropout_keep_prob = 0.5
-hidden_num = 100
-attn_size = 100
+hidden_num = 128
+attn_size = 128
 epoch = 5
 
 
 def preprocess(doc):
     wnl = WordNetLemmatizer()  # 词形还原
-    ps = PorterStemmer()  # 词干提取
     for c in string.punctuation:
         # 去标点
         doc = doc.replace(c, ' ')
@@ -51,27 +49,24 @@ def preprocess(doc):
         # 去数字
         doc = doc.replace(c, '')
     doc = nltk.word_tokenize(doc)
-    # 分割成单词 只保留特定词性单词, 如名词
-    # filter = nltk.pos_tag(doc)
-    # doc = [w for w, pos in filter if pos.startswith("NN")]
     # 只保留长度不小于3的单词,去除停用词,验证是否为英文单词(利用wordnet)
     newdoc = []
     for word in doc:
         # if len(word) >= 3 and word not in stop_words and wordnet.synsets(word):
         if len(word) >= 3 and wordnet.synsets(word):
             word = wnl.lemmatize(word)
-            # word = ps.stem(word)
             newdoc.append(word)
     return newdoc, len(newdoc)
 
 
 def text_to_array(text):
-    empyt_emb = np.array([0] * 300)
+    empyt_emb = np.zeros(300)
+    # print(empyt_emb)
     words, real_length = preprocess(text)
-    embeds = [embeddings_index.get(x, empyt_emb).tolist() for x in words]
-    embeds += [empyt_emb.tolist()] * (SEQ_LEN - len(embeds))
+    embeds = [embeddings_index.get(x, empyt_emb) for x in words]
+    embeds += [empyt_emb] * (SEQ_LEN - len(embeds))
     # print(len(embeds))
-    return embeds, real_length
+    return np.array(embeds), real_length
 
 
 def batch_gen_df(x_df):
@@ -86,7 +81,7 @@ def batch_gen_df(x_df):
             text_arr.append(embeds)
             text_length.append(length)
         target = x_df["target"][i*batch_size:(i+1)*batch_size]
-        yield np.array(text_arr), target._values, np.array(text_length)
+        yield np.array(text_arr), np.array(target), np.array(text_length)
 
 
 def batch_gen_test(x_df):
@@ -124,31 +119,25 @@ class RNN_Attention(object):
                                                                    dtype=tf.float32)
         outputs = tf.concat(outputs, axis=2)
 
-        # attention
-        attention_size = attn_size
-        outputs = tf.transpose(outputs, [1, 0, 2])
-        with tf.name_scope('attention'), tf.variable_scope('attention'):
-            attention_w = tf.Variable(tf.truncated_normal([2 * hidden_num, attention_size], stddev=0.1),
-                                      name='attention_w')
-            attention_b = tf.Variable(tf.constant(0.1, shape=[attention_size]), name='attention_b')
-            u_list = []
-            for t in range(max_length):
-                u_t = tf.tanh(tf.matmul(outputs[t], attention_w) + attention_b)
-                u_list.append(u_t)
-            u_w = tf.Variable(tf.truncated_normal([attention_size, 1], stddev=0.1), name='attention_uw')
-            attn_z = []
-            for t in range(max_length):
-                z_t = tf.matmul(u_list[t], u_w)
-                attn_z.append(z_t)
-            # transform to batch_size * sequence_length
-            attn_zconcat = tf.concat(attn_z, axis=1)
-            # masked
-            attn_zconcat = self.mask(attn_zconcat, self.seq_length, max_length)
-            self.alpha = tf.nn.softmax(attn_zconcat)
-            # transform to sequence_length * batch_size * 1 , same rank as outputs
-            alpha_trans = tf.expand_dims(self.alpha, -1)
+        # attention Trainable parameters
+        w_omega = tf.Variable(tf.random_normal([2 * hidden_num, attn_size], stddev=0.1))
+        b_omega = tf.Variable(tf.random_normal([attn_size], stddev=0.1))
+        u_omega = tf.Variable(tf.random_normal([attn_size], stddev=0.1))
 
-        self.final_output = tf.reduce_sum(tf.transpose(outputs, [1, 0, 2]) * alpha_trans, 1)
+        with tf.name_scope('v'):
+            # Applying fully connected layer with non-linear activation to each of the B*T timestamps;
+            #  the shape of `v` is (B,T,D)*(D,A)=(B,T,A), where A=attention_size
+            v = tf.tanh(tf.einsum("ijk,kl->ijl", outputs, w_omega) + b_omega)
+
+        # For each of the timestamps its vector of size A from `v` is reduced with `u` vector
+        vu = tf.einsum("ijk,kl->ijl", v, tf.expand_dims(u_omega,-1))  # (B,T) shape
+        vu = tf.squeeze(vu, -1)
+        vu = self.mask(vu, self.seq_length, max_length)
+
+        alphas = tf.nn.softmax(vu, name='alphas')  # (B,T) shape
+
+        # Output of (Bi-)RNN is reduced with attention vector; the result has (B,D) shape
+        self.final_output = tf.reduce_sum(outputs * tf.expand_dims(alphas, -1), 1)
 
         # outputs shape: (batch_size, sequence_length, 2*hidden_num)
         fc_w = tf.Variable(tf.truncated_normal([2 * hidden_num, num_classes], stddev=0.1), name='fc_w')
@@ -194,30 +183,36 @@ with tf.Graph().as_default():
             all_loss = 0.0
             accuracys = []
             for trainX_batch, trainY_batch, text_length in tqdm(batch_gen_df(train_df)):
-                feed_dict = {
-                    rnn_att.input_x: trainX_batch,
-                    rnn_att.input_y: trainY_batch,
-                    rnn_att.drop_out_prob: dropout_keep_prob,
-                    rnn_att.seq_length: text_length
-                }
-                _, cost, accuracy = sess.run([rnn_att.train_op, rnn_att.cost, rnn_att.accuracy], feed_dict)
-                all_loss += cost
-                accuracys.append(accuracy)
+                try:
+                    feed_dict = {
+                        rnn_att.input_x: trainX_batch,
+                        rnn_att.input_y: trainY_batch,
+                        rnn_att.drop_out_prob: dropout_keep_prob,
+                        rnn_att.seq_length: text_length
+                    }
+                    _, cost, accuracy = sess.run([rnn_att.train_op, rnn_att.cost, rnn_att.accuracy], feed_dict)
+                    all_loss += cost
+                    accuracys.append(accuracy)
+                except:
+                    pass
 
             print("第" + str((time + 1)) + "次迭代的损失为：" + str(all_loss) + ";准确率为：" + str(np.mean(accuracys)))
 
             all_dev_score = []
             y_dev = []
             for valX_batch, valY_batch, text_length in tqdm(batch_gen_df(val_df)):
-                feed_dict = {
-                    rnn_att.input_x: valX_batch,
-                    rnn_att.input_y: valY_batch,
-                    rnn_att.drop_out_prob: 1.0,
-                    rnn_att.seq_length: text_length
-                }
-                dev_loss, dev_score = sess.run([rnn_att.cost, rnn_att.score], feed_dict)
-                all_dev_score.extend(dev_score.tolist())
-                y_dev.extend(valY_batch)
+                try:
+                    feed_dict = {
+                        rnn_att.input_x: valX_batch,
+                        rnn_att.input_y: valY_batch,
+                        rnn_att.drop_out_prob: 1.0,
+                        rnn_att.seq_length: text_length
+                    }
+                    dev_loss, dev_score = sess.run([rnn_att.cost, rnn_att.score], feed_dict)
+                    all_dev_score.extend(dev_score.tolist())
+                    y_dev.extend(valY_batch)
+                except:
+                    pass
 
             all_dev = []
             for x in all_dev_score:
@@ -255,4 +250,3 @@ with tf.Graph().as_default():
         submit_df = pd.DataFrame({"qid": test_df["qid"], "prediction": all_preds})
         submit_df.to_csv("submission.csv", index=False)
         print('submission success')
-

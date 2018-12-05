@@ -34,7 +34,7 @@ class Infer(object):
                 self.drop_keep_prob = graph.get_operation_by_name("drop_keep_prob").outputs[0]
 
                 # Tensors we want to evaluate
-                self.predictions = graph.get_operation_by_name("output/predictions").outputs[0]
+                self.predictions = graph.get_operation_by_name("predictions").outputs[0]
                 self.scores = graph.get_operation_by_name("output/scores").outputs[0]
 
     def infer(self, sentences):
@@ -54,9 +54,12 @@ class Infer(object):
         }
         y, s = self.sess.run([self.predictions, score], feed_dict)
 
-        # 将数字转换为对应的意图
-        labels = [dicts[x] for x in y]
-        s = [np.max(x) for x in s]
+        labels = []
+        for x in range(len(y)):
+            if s[x][1] > 0.35:
+                labels.append('1')
+            else:
+                labels.append('0')
         return labels, s
 
     # test the model
