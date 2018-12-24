@@ -3,7 +3,6 @@ import pandas as pd
 import string
 import nltk
 from nltk.stem import WordNetLemmatizer
-from nltk.stem.porter import PorterStemmer
 from nltk.corpus import wordnet
 from tqdm import tqdm
 import numpy as np
@@ -13,6 +12,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import accuracy_score
 import tensorflow as tf
+from tensorflow.python.ops import array_ops
 
 if not os.path.exists('output'):
     os.makedirs('output')
@@ -30,6 +30,8 @@ for line in tqdm(f):
     coefs = np.asarray(values[1:], dtype='float32')
     embeddings_index[word] = coefs
 f.close()
+
+print(len(embeddings_index.keys()))
 
 batch_size = 256
 SEQ_LEN = 70
@@ -110,9 +112,11 @@ class RNN_Attention(object):
             self.embedding_chars = self.input_x
 
             # build model
-            cell_fw = tf.nn.rnn_cell.LSTMCell(hidden_num)
+            # cell_fw = tf.nn.rnn_cell.LSTMCell(hidden_num)
+            cell_fw = tf.contrib.rnn.SRUCell(hidden_num)
             fw_lstm_cell = tf.contrib.rnn.DropoutWrapper(cell_fw, output_keep_prob=self.drop_out_prob)
-            cell_bw = tf.nn.rnn_cell.LSTMCell(hidden_num)
+            # cell_bw = tf.nn.rnn_cell.LSTMCell(hidden_num)
+            cell_bw = tf.contrib.rnn.SRUCell(hidden_num)
             bw_lstm_cell = tf.contrib.rnn.DropoutWrapper(cell_bw, output_keep_prob=self.drop_out_prob)
 
             (outputs, output_states) = tf.nn.bidirectional_dynamic_rnn(fw_lstm_cell, bw_lstm_cell, self.embedding_chars,
@@ -162,6 +166,35 @@ class RNN_Attention(object):
     def mask(self, inputs, seq_len, max_len):
         mask = tf.cast(tf.sequence_mask(seq_len, maxlen=max_len), tf.float32)
         return inputs - (1 - mask) * 1e12
+
+    def focal_loss(self, prediction_tensor, target_tensor, weights=None, alpha=1.0, gamma=2):
+        r"""Compute focal loss for predictions.
+            Multi-labels Focal loss formula:
+                FL = -alpha * (z-p)^gamma * log(p) -(1-alpha) * p^gamma * log(1-p)
+                     ,which alpha = 0.25, gamma = 2, p = sigmoid(x), z = target_tensor.
+        Args:
+         prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+            num_classes] representing the predicted logits for each class
+         target_tensor: A float tensor of shape [batch_size, num_anchors,
+            num_classes] representing one-hot encoded classification targets
+         weights: A float tensor of shape [batch_size, num_anchors]
+         alpha: A scalar tensor for focal loss alpha hyper-parameter
+         gamma: A scalar tensor for focal loss gamma hyper-parameter
+        Returns:
+            loss: A (scalar) tensor representing the value of the loss function
+        """
+        # sigmoid_p = tf.nn.sigmoid(prediction_tensor)
+        sigmoid_p = prediction_tensor
+
+        zeros = array_ops.zeros_like(sigmoid_p, dtype=sigmoid_p.dtype)
+
+        # For poitive prediction, only need consider front part loss, back part is 0;
+        # target_tensor > zeros <=> z=1, so poitive coefficient = z - p.
+        pos_p_sub = array_ops.where(target_tensor > zeros, target_tensor - sigmoid_p, zeros)
+
+        my_entry_cross = - alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(sigmoid_p, 1e-8, 1.0))
+
+        return tf.reduce_mean(my_entry_cross)
 
 
 with tf.Graph().as_default():
