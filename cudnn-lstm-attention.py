@@ -304,7 +304,7 @@ class RNN_Attention(object):
         self.final_output = tf.reduce_sum(outputs * tf.expand_dims(alphas, -1), 1)
 
         # outputs shape: (batch_size, sequence_length, 2*hidden_num)
-        fc_w = tf.Variable(tf.truncated_normal([2 * hidden_num, num_classes], stddev=0.1), name='fc_w')
+        fc_w = tf.Variable(tf.truncated_normal([2 * hidden_num * num_layers, num_classes], stddev=0.1), name='fc_w')
         fc_b = tf.Variable(tf.zeros([num_classes]), name='fc_b')
 
         self.logits = tf.matmul(self.final_output, fc_w) + fc_b
